@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinosaki Onsen Travel Guide</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f7f9fa; }
+        #app { display: flex; height: 100vh; }
+        
+        /* Sidebar Styles */
+        #sidebar { width: 380px; overflow-y: auto; padding: 20px; border-right: 1px solid #e1e4e6; background: #ffffff; box-sizing: border-box; display: flex; flex-direction: column; }
+        h1 { font-size: 22px; color: #1a202c; margin-top: 0; margin-bottom: 5px; font-weight: 700; }
+        .subtitle { font-size: 14px; color: #718096; margin-bottom: 20px; }
+        
+        /* Map Layout */
+        #map { flex-grow: 1; height: 100%; }
+
+        /* Mobile Optimization */
+        @media (max-width: 768px) {
+            #app { flex-direction: column-reverse; }
+            #sidebar { width: 100%; height: 45%; border-right: none; border-top: 1px solid #e1e4e6; padding: 15px; }
+            #map { height: 55%; width: 100%; }
+        }
+
+        /* Category Separators */
+        .category-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #a0aec0; margin: 15px 0 8px 0; font-weight: 600; border-bottom: 1px solid #edf2f7; padding-bottom: 4px; }
+        
+        /* Interactive List Items */
+        .location-item { display: flex; align-items: center; padding: 12px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 5px; transition: background 0.2s ease, transform 0.1s ease; -webkit-tap-highlight-color: transparent; }
+        .location-item:hover { background: #f7f9fa; }
+        .location-item:active { transform: scale(0.98); background: #edf2f7; }
+        .location-item-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 14px; flex-shrink: 0; }
+        .location-item-info { flex-grow: 1; }
+        .location-item-name { font-size: 15px; font-weight: 600; color: #2d3748; margin: 0 0 2px 0; }
+        .location-item-desc { font-size: 12px; color: #718096; margin: 0; }
+
+	/* Styles bộ lọc */
+        #filters { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 15px; }
+        .pill { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: #edf2f7; color: #4a5568; cursor: pointer; transition: .2s; border: 1px solid #e2e8f0; }
+        .pill.active { background: #3182CE; color: white; border-color: #3182CE; }
+
+        .category-title { font-size: 12px; text-transform: uppercase; color: #a0aec0; margin: 15px 0 8px 0; font-weight: 700; border-bottom: 1px solid #edf2f7; }
+        .location-item { display: flex; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+        .location-item:hover { background: #f7f9fa; }
+        .location-item-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 12px; }
+
+        /* Custom Map Marker Icons CSS */
+        .map-custom-marker { background: #ffffff; border-radius: 50%; text-align: center; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0,0,0,0.24); border: 2px solid #ffffff; width: 32px !important; height: 32px !important; }
+        .map-custom-marker i { font-size: 14px; }
+        
+        /* POPUP DETAILS CARD */
+        .popup-card { width: 280px; font-family: sans-serif; max-height: 400px; overflow-y: auto; padding-right: 5px; }
+        .popup-img { width: 100%; height: 130px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; background: #edf2f7; }
+        .popup-title { font-weight: 700; font-size: 16px; margin-bottom: 6px; color: #1a202c; border-bottom: 1px solid #edf2f7; padding-bottom: 4px; }
+        .popup-meta { font-size: 12px; color: #4a5568; margin-bottom: 4px; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+        .popup-meta i { color: #718096; width: 14px; text-align: center; margin-top: 2px; }
+        .popup-section-title { font-size: 11px; font-weight: 700; color: #a0aec0; text-transform: uppercase; margin-top: 8px; margin-bottom: 4px; letter-spacing: 0.05em; border-bottom: 1px dashed #edf2f7; padding-bottom: 2px; }
+        
+        /* ĐỊNH DẠNG NÚT BẤM GOOGLE MAPS */
+        .gmaps-btn { display: flex; align-items: center; justify-content: center; gap: 8px; background-color: #2da44e; color: white !important; text-decoration: none !important; font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 6px; margin-top: 12px; text-align: center; transition: background 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .gmaps-btn:hover { background-color: #2c974b; }
+        .gmaps-btn i { font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="sidebar">
+        <h1>城崎温泉</h1>
+        <div class="subtitle">地図上の店名やアイコンをタップすると、詳細と写真が表示されます。</div>
+        <div id="list-container"></div>
+    </div>
+    <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // Tự động đặt tâm bản đồ (Center) ngay tại Ryokufu kaku [35.62445, 134.81135] với độ zoom 17 gần hơn để khách dễ nhìn thấy điểm xuất phát
+    const map = L.map('map', { zoomControl: true, tap: false }).setView([35.62445, 134.81135], 17);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // =========================================================================
+    // KHU VỰC DỮ LIỆU ĐỊA ĐIỂM
+    // =========================================================================
+    const dataset = {
+        // Đưa địa điểm làm việc của bạn lên vị trí đầu tiên
+        "当館": [
+            {
+                name: "緑風閣", lat: 35.6254238, lng: 134.8121012, icon: "fa-hotel", color: "#E53E3E", // Màu đỏ nổi bật
+                image: "", google_maps_link: "https://maps.app.goo.gl/Bd2K2vFtW99rzAxu6",
+                recommended_by: "",
+                highlight: "",
+                opening_hours: "チェックイン　15:00", dayoff: "8月: 4日, 5日, 12日, 18日, 19日, 27日, 28日"
+            }
+        ],
+        
+        "外湯": [
+           
+            { 
+                name: "地蔵湯", lat: 35.6267329, lng: 134.8126665, icon: "fa-hot-tub-person", color: "#3182CE", image: "", google_maps_link: "https://maps.app.goo.gl/UFhtH5dm4FXLUHG29", 
+                recommended_by: "",
+                highlight: "和風の灯篭を模した外観が特徴的。レトロな内湯の雰囲気があり、地元のファミリー層にも大人気です。",
+                opening_hours: "07:00 - 23:00", dayoff: "月曜日" 
+            },
+            { 
+                name: "柳湯", lat: 35.6264888, lng: 134.8103239, icon: "fa-hot-tub-person", color: "#3182CE", image: "", google_maps_link: "https://maps.app.goo.gl/qhcUuJowoJzwDhFo9", 
+                recommended_by: "",
+                highlight: "川沿いの柳並木にちなんで名付けられました。桧造りのこぢんまりとした、温かみのある和モダンな内装です。",
+                opening_hours: "15:00 - 23:00", dayoff: "木曜日" 
+            },
+            { 
+                name: "一の湯", lat: 35.6261735, lng: 134.8094847, icon: "fa-hot-tub-person", color: "#3182CE", image: "", google_maps_link: "https://maps.google.com/?q=Ichino-yu+Kinosaki", 
+                recommended_by: "",
+                highlight: "「天下一の温泉」として知られています。自然岩を削って作られた、大迫力の洞窟風呂が魅力です。",
+                opening_hours: "07:00 - 23:00", dayoff: "水曜日" 
+            },
+            { 
+                name: "御所の湯", lat: 35.6259683, lng: 134.8073577, icon: "fa-hot-tub-person", color: "#3182CE", image: "", google_maps_link: "https://maps.app.goo.gl/PVEM6EdXqjT4XPM97", 
+                recommended_by: "",
+                highlight: "京都の御所を模して建てられた「美人の湯」。お湯に浸かりながら、美しい屋外の滝の景色を眺めることができます。",
+                opening_hours: "07:00 - 23:00", dayoff: "木曜日" 
+            },
+            { 
+                name: "まんだら湯", lat: 35.6246076, lng: 134.8055821, icon: "fa-hot-tub-person", color: "#3182CE", image: "", google_maps_link: "https://maps.google.com/?q=Mandara-yu+Kinosaki", 
+                recommended_by: "",
+                highlight: "静かな路地裏に佇む温泉。穏やかな山々を眺めながら、心地よい陶器の桶風呂（露天風呂）が楽しめます。",
+                opening_hours: "15:00 - 23:00", dayoff: "水曜日" 
+            },
+            { 
+                name: "鴻の湯", lat: 35.62630395533045, lng: 134.80448588042717, icon: "fa-hot-tub-person", color: "#3182CE", image: "", google_maps_link: "https://maps.google.com/?q=Kouno-yu+Kinosaki", 
+                recommended_by: "",
+                highlight: "城崎で最も古い外湯。足を痛めたコウノトリがここで傷を癒したという伝説があります。美しい庭園の景色が広がっています。",
+                opening_hours: "07:00 - 23:00", dayoff: "10月30日まで休業"
+            }
+        ],
+        
+        "昼食": [
+            { 
+                name: "おけしょう鮮魚の海中苑 本店", lat: 35.6251014, lng: 134.8127251, icon: "fa-utensils", color: "#DD6B20",
+                image: "https://i.imgur.com/h4sN8P1.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/QUeawB338L7y2y8b8", 
+                recommended_by: "大島さん",
+                highlight: "海鮮丼。<br>まず私がおすすめするのは海鮮丼です。朝にとれた新鮮な魚を使っているため、色合いも美しく、身はぷりぷりとした食感が楽しめます。また、日によって仕入れ状況が変わるので、ネタの種類が豊富なのも魅力です。",
+                opening_hours: "11:00-19:00", dayoff: "不定休",
+                price_range: "800￥ ~ 3.300￥", credit_card: "可",
+                dine_in: "イートイン", group_size: "", english_support: "English menu / English spoken",
+                peak_hours: "11:00 ~ 13:30", avg_waiting_time: "0-15分", reservation: "おすすめ"
+            },
+            { 
+                name: "ほしそば", lat: 35.6245433, lng: 134.8128033, icon: "fa-utensils", color: "#DD6B20",
+                image: "https://i.imgur.com/V8jwxFe.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/UJSdZgWwDf6bPY8T8", 
+                recommended_by: "牛根さん",
+                highlight: "皿そば。<br>素晴らしいランチスポットをお探しなら、ぜひ「星そば」がおすすめです！店内はモダンで清潔感があり、とても入りやすい雰囲気。名物の本格的な「出石皿そば」は外せません。店内で打たれた自家製麺は、豊かなそばの香りと素晴らしいコシを楽しめます。",
+                opening_hours: "11:00–15:00", dayoff: "不定休",
+                price_range: "1.100￥ ~ 1.700￥", credit_card: "可",
+                dine_in: "イートイン", group_size: "", english_support: "English menu / English spoken",
+                peak_hours: "~11:00", avg_waiting_time: "なし", reservation: "不要"
+            },
+            { 
+                name: "お食事処山よし", lat: 35.6241159, lng: 134.8130899, icon: "fa-utensils", color: "#DD6B20",
+                image: "https://i.imgur.com/GObBqmM.jpeg", google_maps_link: "https://maps.app.goo.gl/jnDpF8UpP9JgZV5R8", 
+                recommended_by: "中田さん",
+                highlight: "特上かに寿司定食。<br>城崎温泉駅の近くで素晴らしいシーフードランチを堪能するなら、「お食事処 山よし」がイチオシです！ここに来たら、ぜひ「特上かに寿司定食」を味わってみてください。カニは驚くほど新鮮で甘みがあり、口の中でとろけます。ぜひお試しください！",
+                opening_hours: "11:00–15:00", dayoff: "木曜日",
+                price_range: "800￥ ~ 3.400￥", credit_card: "可",
+                dine_in: "イートイン・テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "~12:00", avg_waiting_time: "10分 ~ 30分", reservation: "不要"
+            }
+        ],
+        
+        "昼食 & 夕食": [
+            { 
+                name: "城崎うなぎ処 うな京", lat: 35.627352027127344, lng: 134.8120488265592, icon: "fa-bowl-rice", color: "#DD6B20",
+                image: "https://i.imgur.com/xTQgsUi.jpeg", google_maps_link: "https://maps.app.goo.gl/yAJXjejAaAAir7Ku5", 
+                recommended_by: "山本さん",
+                highlight: "極上うな重。<br>素晴らしいお食事体験のために「城崎うなぎ処 うな喬」を強くおすすめします！浜名湖産の最高級うなぎを使用した「ひつまぶし」や贅沢なうなぎ料理は必食です。うなぎは非常に新鮮で、調理する前に生きた状態のものを見せてくれるほど。最高の価値、トップクラスの味わい、そして素晴らしいおもてなしを提供してくれます。",
+                opening_hours: "11:00–14:00, 18:00–22:00", dayoff: "土曜日・日曜日",
+                price_range: "1.198¥ ~ 3.980¥", credit_card: "可",
+                dine_in: "イートイン", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "19:00 ~ 20:00", avg_waiting_time: "10分", reservation: "おすすめ"
+            },
+            { 
+                name: "鴨ラーメンたぬき", lat: 35.6253202, lng: 134.8080229, icon: "fa-bowl-food", color: "#DD6B20",
+                image: "https://i.imgur.com/WF8u5ps.jpeg", google_maps_link: "https://maps.app.goo.gl/fHLSFyJunn8fPdnf8", 
+                recommended_by: "栗田さん",
+                highlight: "醤油ラーメン。<br>城崎温泉で本当にユニークな食事を求めているなら、「鴨ラーメン たぬき」がとてもおすすめです！木屋町小路の路地裏に佇むこの隠れた名店は、深くホッとする味わいの「鴨醤油ラーメン」でラーメンの常識を覆します。すぐに売り切れてしまうこぢんまりとした人気店ですが、特定の夜にはディナー営業もしており、開店と同時に駆け込むのにぴったりな、忘れられないスポットです！",
+                opening_hours: "11:00–15:00, 17:00–19:00", dayoff: "不定休",
+                price_range: "950¥ ~ 2.250¥", credit_card: "可",
+                dine_in: "イートイン", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "14:00~", avg_waiting_time: "~10分", reservation: "おすすめ"
+            }
+        ],
+
+        "食べ歩き": [
+            {
+                name: "牛匠 上田 城崎店", lat: 35.6253287, lng: 134.8127000, icon: "fa-stroopwafel", color: "#673AB7",
+                image: "https://i.imgur.com/RY7u5ID.jpeg", google_maps_link: "https://maps.app.goo.gl/aGFpCyReXBeuk9pm8",
+                recommended_by: "中田さん",
+                highlight: "但馬牛ステーキ串。<br>焼きたての但馬牛ステーキ串はお口の中でとろけるほど柔らかく、注文を受けてから揚げるメンチカツは驚くほどサクサクでジューシー！立ち寄りスペースもある人気の肉屋で、温泉街の食べ歩きにぴったりな贅沢な逸品です。",
+                opening_hours: "10:00–17:30", dayoff: "不定休",
+                price_range: "250¥ ~ 1.800¥", credit_card: "可",
+                dine_in: "イートイン / テークアウト", group_size: "Solo diners / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "12:00~", avg_waiting_time: "~5分", reservation: "不要"
+            },
+            {
+                name: "ちから餅", lat: 35.625797, lng: 134.808165, icon: "fa-ice-cream", color: "#673AB7",
+                image: "https://i.imgur.com/NX6pfiY.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/yMZR16CtVnfXRGKM8",
+                recommended_by: "中田さん",
+                highlight: "バニラソフトクリーム。<br>城崎温泉でレトロな雰囲気を味わうなら「力餅」がイチオシ！うどんや麺類で知られていますが、実はバニラソフトクリームも隠れた名物。昔ながらの素朴で懐かしい味わいで、手際よく提供してくれます。外湯巡りや夜桜鑑賞の合間の食べ歩きにぴったりな、爽やかなスイーツです！",
+                opening_hours: "11:00–22:00", dayoff: "木曜日",
+                price_range: "550¥ ~ 950¥", credit_card: "可",
+                dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "なし", avg_waiting_time: "なし", reservation: "不要"
+            },
+            {
+                name: "片島成好堂", lat: 35.6255019, lng: 134.8079826, icon: "fa-cookie-bite", color: "#673AB7",
+                image: "https://i.imgur.com/Xh5LLEI.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/56tmzuE79pTspEAV9",
+                recommended_by: "牛根さん",
+                highlight: "バニラソフトクリーム。<br>城崎温泉でレトロな雰囲気を味わうなら「力餅」がイチオシ！うどんや麺類で知られていますが、実はバニラソフトクリームも隠れた名物。昔ながらの素朴で懐かしい味わいで、手際よく提供してくれます。外湯巡りや夜桜鑑賞の合間の食べ歩きにぴったりな、爽やかなスイーツです！",
+                opening_hours: "10:00–17:00", dayoff: "Wednesday, Thursday",
+                price_range: "180¥ ~ 750¥", credit_card: "可 / 現金不可",
+                dine_in: "テークアウトのみ", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken / None",
+                peak_hours: "13:00~", avg_waiting_time: "-", reservation: "不要"
+            },
+            {
+                name: "とうふ処はせがわ", lat: 35.6252311, lng: 134.8118695, icon: "fa-cheese", color: "#673AB7",
+                image: "https://i.imgur.com/LXzmqYj.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/HzgmGZbBR724Mcx37",
+                recommended_by: "牛根さん・ハンさん",
+                highlight: "豆腐ドーナツ。<br>城崎温泉でのヘルシーなおやつタイムには「長谷川豆腐店」がおすすめ！できたての豆腐ドーナツは軽やかでフワフワ、控えめな甘さが絶品です。冬場には温かい店内の足湯に浸かりながらドーナツを楽しむこともでき、温泉街の散策中に体も心もリフレッシュできる隠れた名スポットです！",
+                opening_hours: "10:00–18:00", dayoff: "火曜日・木曜日",
+                price_range: "130¥ ~ 650¥", credit_card: "現金のみ",
+                dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English spoken",
+                peak_hours: "10:00 (冬)", avg_waiting_time: "なし", reservation: "不要"
+            },
+            {
+                name: "たまご専門 本巣ヱ（もとすえ）", lat: 35.6242405, lng: 134.8132173, icon: "fa-egg", color: "#673AB7",
+                image: "https://i.imgur.com/Ddem1Tr.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/Kk9T5Wnu9ccb4ftw7",
+                recommended_by: "ハンさん",
+                highlight: "チョコたまごパン。<br>看板商品のプルプル＆とろける食感のたまごパンに、濃厚でなめらかなチョコを合わせた贅沢な「チョコたまごパン」。程よい甘さと深い味わいが魅力で、駅を降りてすぐの食べ歩きにもぴったりな極上スイーツです！",
+                opening_hours: "10:00 ~ 17:00", dayoff: "不定休",
+                price_range: "520￥ ~ 1900￥", credit_card: "可",
+                dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English spoken",
+                peak_hours: "10:00 ~ 14:00", avg_waiting_time: "0-10分", reservation: "不要必"
+            },
+            {
+                name: "城崎温泉 氷とカニ", lat: 35.6241121, lng: 134.8130168, icon: "fa-crab", color: "#673AB7",
+                image: "https://i.imgur.com/bRMkdta.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/deabhFiu3hyJHbkD6",
+                recommended_by: "フォンさん",
+                highlight: "甲羅焼き。<br>本物のカニの甲羅で焼き上げた名物「甲羅焼き（カニドリア）」はカニ好き必見！甘く柔らかいカニ身と濃厚なカニミソがたっぷり詰まっており、こんがり溶けたチーズとの相性が抜群です。手軽に味わえる至高の贅沢グルメをぜひ！",
+                opening_hours: "10:00–17:00", dayoff: "不定休",
+                price_range: "1.480¥ ~ 2.900¥", credit_card: "可",
+                dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "13:00 ~ 15:00", avg_waiting_time: "~5分", reservation: "不要"
+            },
+            {
+                name: "発酵餡菓 うかわ", lat: 35.6241059, lng: 134.8130152, icon: "fa-bread-slice", color: "#673AB7",
+                image: "https://i.imgur.com/WkgDyM4.jpeg",
+                google_maps_link: "",
+                recommended_by: "岡本さん",
+                highlight: "きなこパン。<br>看板商品の「きなこパン」は大人気の逸品！外はカリッと、中は驚くほどフワフワで、香ばしい黒豆きな粉がたっぷりまぶされています。外湯巡りの散策のお供にぴったりな、ほっとする甘さの絶品おやつです！",
+                opening_hours: "10:00–17:00", dayoff: "不定休",
+                price_range: "300¥ ~ 1.200¥", credit_card: "可",
+                dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "13:00 ~ 15:00", avg_waiting_time: "なし", reservation: "不要"
+            }
+        ],
+
+        "カフェ": [
+            {
+                name: "城崎温泉元湯 城崎ジェラートカフェChaya", lat: 35.6256473, lng: 134.8042581, icon: "fa-mug-hot", color: "#795548",
+                image: "https://i.imgur.com/WfsRjr8.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/vbctb8fWNfGMcdnU7",
+                recommended_by: "ハンさん",
+                highlight: "温泉たまご（DIY体験）。<br>「茶屋」での温泉たまご作り体験がイチオシ！城崎温泉の散策中に楽しめる、ユニークでとても楽しい体験型のおやつタイムです。お店で生卵を購入し、すぐ外にある源泉に投入したら、隣の足湯に浸かりながら約9分待つだけ！にぎやかで居心地の良いスポットなので、ぜひ立ち寄ってみてください！",
+                opening_hours: "09:30–17:30", dayoff: "木曜日",
+                price_range: "350¥ ~ 1.000¥", credit_card: "可",
+                dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+                peak_hours: "11:00 / 15:00", avg_waiting_time: "なし", reservation: "不要"
+            },
+            {
+                name: "短編喫茶Un", lat: 35.6248752, lng: 134.8127426, icon: "fa-book-open", color: "#795548",
+                image: "https://i.imgur.com/D6rwJFH.jpeg",
+                google_maps_link: "https://maps.app.goo.gl/QuKAgbgpi3636naW8",
+                recommended_by: "松尾さん",
+                highlight: "バターどら焼き。<br>老舗旅館「西村屋」がプロデュースする、ゆったりと寛げるブックカフェ。名物の生バターどら焼きはもちろんですが、個人的なイチオシは「チーズチョコ」と「塩ミルク」！甘さと塩気のバランスが絶妙で、至福の味わいです。",
+                opening_hours: "10:00–17:00", dayoff: "木曜日",
+                price_range: "330¥ ~ 600¥", credit_card: "可",
+                dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken ",
+                peak_hours: "13:00 ~ 15:00", avg_waiting_time: "なし", reservation: "不要"
+            },
+		{
+        name: "城崎ビネガー店", lat: 35.6255186, lng: 134.8079662, icon: "fa-wine-bottle", color: "#795548",
+        image: "https://i.imgur.com/9vDLc4q.jpeg", google_maps_link: "https://maps.app.goo.gl/r7vBEWCXB5BNa9fT7",
+        recommended_by: "牛根さん",
+        highlight: "ピンクグレープフルーツビネガー（ソーダ割）。爽やかな「ピンクグレープフルーツソーダ」は超おすすめ！甘酸っぱいグレープフルーツの風味が爽快なシュワシュワ感とマッチし、火照った体をすっきりとリフレッシュしてくれます。温泉街の散策のお供にぴったりな、ヘルシーで美味しいドリンクです！",
+        opening_hours: "10:00–17:00", dayoff: "木曜日",
+        price_range: "330¥ ~ 440¥", credit_card: "可",
+        dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken ",
+        peak_hours: "なし", avg_waiting_time: "なし", reservation: "不要"
+    },
+	{
+        name: "城崎珈琲みはらしテラスカフェ", lat: 35.6225840, lng: 134.7972662, icon: "fa-utensils", color: "#795548",
+        image: "https://i.imgur.com/3jqFlHV.jpeg", google_maps_link: "https://maps.app.goo.gl/yYdQjCfjJtmncTdf7",
+        recommended_by: "中田さん",
+        highlight: "ホットドッグセット。<br>地元のブランド牛「但馬牛」を100%使用したジューシーで旨味たっぷりのソーセージを、香ばしく焼いたパンに挟んだ絶品ホットドッグセット！淹れたてのブレンドコーヒーと共に、山頂からの城崎温泉街や海の絶景を眺めながら味わう最高のひとときを楽しめます。",
+        opening_hours: "10:00–16:00", dayoff: "木曜日",
+        price_range: "380¥ ~ 1.300¥", credit_card: "可",
+        dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken ",
+        peak_hours: "10:00–15:00", avg_waiting_time: "5分", reservation: "不要"
+    },
+	{
+        name: "PARADI", lat: 35.6249458, lng: 134.8074298, icon: "fa-bread-slice", color: "#795548",
+        image: "https://i.imgur.com/MTw45c9.jpeg", google_maps_link: "https://maps.app.goo.gl/Y1FrgFe4pzSJkDrR9",
+        recommended_by: "中田さん",
+        highlight: "クロワッサン。<br>名物のクロワッサンはまさに傑作！外はサクサク＆パリッとした食感で芳醇なバターの香りが広がり、中は驚くほどフワッと軽やか。アイスコーヒーを片手に川の上の橋に設けられたテラス席に座れば、温泉街にいながらフレンチカフェのような雰囲気を満喫できます！",
+        opening_hours: "09:00–18:00", dayoff: "木曜日",
+        price_range: "500¥ ~ 1.750¥", credit_card: "可",
+        dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken ",
+        peak_hours: "09:00–11:00", avg_waiting_time: "なし", reservation: "不要"
+    },
+	{
+        name: "お芋とカヌレ 城崎足湯カフェ", lat: 35.6242293, lng: 134.8128120, icon: "fa-cookie-bite", color: "#795548",
+        image: "https://i.imgur.com/Mzr6a3d.jpeg", google_maps_link: "https://maps.app.goo.gl/7DSmepB516c291N48",
+        recommended_by: "中田さん",
+        highlight: "焼き芋カヌレソフトクリーム。<br>スイーツ好きなら絶対に外せないスポット！なめらかなソフトクリームに香ばしい焼き芋を合わせ、さらに手のひらサイズのカリッとしたカヌレをトッピングした贅沢な逸品です。店内の足湯に浸かりながら味わう、至福の和モダンデザートをお楽しみください！",
+        opening_hours: "09:00–18:00", dayoff: "不定休",
+        price_range: "200¥ ~ 2.500¥", credit_card: "可",
+        dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken ",
+        peak_hours: "13:00–17:00", avg_waiting_time: "なし", reservation: "不要"
+    },
+    {
+        name: "城崎プリン専門店 kiman 生萬", lat: 35.6262806, lng: 134.8115017, icon: "fa-ice-cream", color: "#795548",
+        image: "https://i.imgur.com/V0W4RDS.jpeg", google_maps_link: "https://maps.app.goo.gl/GkoqWaMj1xxC53SN7",
+        recommended_by: "フォンさん",
+        highlight: "プリンアソート。<br>名物のプレミアムプリンは、お口に入れた瞬間に溶けるほどなめらかでトロトロの食感が自慢！王道のたまごプリン、濃厚なクレームブリュレ、プレミアムフレーバーを一度に味わえる人気の食べ比べセットが一番のおすすめです。",
+        opening_hours: "10:00–18:00", dayoff: "不定休",
+        price_range: "370¥ ~ 790¥", credit_card: "可",
+        dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken ",
+        peak_hours: "15:00~", avg_waiting_time: "なし", reservation: "不要"
+    },
+	{
+        name: "城崎　ロープウェイ", lat: 35.6227497, lng: 134.7972994, icon: "fa-mountain", color: "#795548",
+        image: "https://i.imgur.com/jzRgYKt.jpeg", google_maps_link: "https://maps.app.goo.gl/GqEutHgPxvN5u2Z17",
+        recommended_by: "松尾さん",
+        highlight: "ハイキング＆ロープウェイ。<br>日本の豊かな自然を肌で感じながら、健康的にリフレッシュできるハイキングコースです。風景を楽しみながら歩くことで、心地よい運動になります。温泉街でのリラックスタイムにアクティブな体験を組み合わせることで、より充実した滞在になります。ハイキング後の山頂カフェでの休憩もおすすめです。",
+        opening_hours: "09:10–17:10", dayoff: "不定休",
+        price_range: "380¥ ~ 1.200¥", credit_card: "不可",
+        dine_in: "", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken ",
+        peak_hours: "10:00–15:00", avg_waiting_time: "なし", reservation: "不要"
+    },
+	{
+        name: "城崎ときわガーデン", lat: 35.6266333, lng: 134.8125176, icon: "fa-coffee", color: "#795548",
+        image: "https://i.imgur.com/0QJOczz.jpeg", google_maps_link: "https://maps.app.goo.gl/EH6W9Fp6VhWTvkMT6",
+        recommended_by: "中田さん",
+        highlight: "コーヒー牛乳。<br>高い天井と木のぬくもりを感じるスタイリッシュな空間で、「DRIP & DROP COFFEE SUPPLY」のスペシャルティコーヒーが味わえるお店。レトロな瓶に入った名物の「コーヒー牛乳」は、ほろ苦さとまろやかさが絶妙な大人の味わい。川沿いのベンチや風呂上がりのリラックスタイムに最高の一杯です！",
+        opening_hours: "08:00–18:00", dayoff: "不定休",
+        price_range: "500¥ ~ 800¥", credit_card: "可",
+        dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken",
+        peak_hours: "10:00–15:00", avg_waiting_time: "5分", reservation: "不要"
+    }
+		
+        ],
+
+        "お土産": [
+            {
+                name: "TAS", lat: 35.6252028, lng: 134.8124073, icon: "fa-shop", color: "#9C27B0",
+                image: "https://i.imgur.com/cYZ6CDN.jpeg", google_maps_link: "https://maps.app.goo.gl/uRCWhHixCNAgi2fB7", recommended_by: "完山さん", highlight: "クッキー。<br>洗練されたミニマルな空間が魅力の隠れ家カフェ。名物のクッキーは厚焼きで香ばしく、厳選素材がぎっしり詰まっています。外側はサクッ、中はしっとりとした理想的な食感！こだわりのスペシャルティコーヒーと一緒に、おしゃれで贅沢なティータイムをお過ごしください。",  opening_hours: "10:30–16:00", dayoff: "日曜日・月曜日・火曜日", price_range: "400¥ ~ 2.000¥", credit_card: "可", dine_in: "テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken", peak_hours: "なし", avg_waiting_time: "なし", reservation: "不要"
+            },
+            {
+                name: "城崎茶宴 ちゃの湯", lat: 35.6265861, lng: 134.8115356, icon: "fa-leaf", color: "#9C27B0",
+                image: "https://i.imgur.com/XrClNSz.jpeg", google_maps_link: "https://maps.app.goo.gl/1BLWyexiuctM91GVA", recommended_by: "山本さん", highlight: "焼き芋フレーバー緑茶。<br>日本茶の魅力を伝える気さくな店主が迎えてくれる温かいお茶専門店。おすすめの「焼き芋フレーバー緑茶」は、香ばしい緑茶に焼き芋の自然な甘い香りがふんわり漂うユニークなお茶です。人気の抹茶ロールケーキとの相性も抜群で、散策中のホッと一息にぴったりな和のドリンクです！", opening_hours: "10:30–18:00", dayoff: "水曜日", price_range: "500¥ ~ 1.620¥", credit_card: "可", dine_in: "イートイン / テークアウト", group_size: "Solo / couples / large groups", english_support: "English menu / English spoken", peak_hours: "なし", avg_waiting_time: "なし", reservation: "不要"
+            }
+			    ],
+
+        "ドラックストア": [
+            {
+                name: "小田薬局", lat: 35.626636430598154, lng: 134.81161200256892, icon: "fa-shop", color: "#9C27B0", 
+                image: "", google_maps_link: "https://maps.app.goo.gl/1Tz1j6cMyhnDERjt8", recommended_by: "福留さん", highlight: "",  opening_hours: "09:00–17:00", dayoff: "日曜日", price_range: " ", credit_card: "なし", dine_in: "不可", group_size: " ", english_support: " ", peak_hours: "なし", avg_waiting_time: "なし", reservation: "不要"
+            }
+] // <-- THÊM DẤU NÀY
+    };    // <-- THÊM DẤU NÀY ĐỂ ĐÓNG DATASET
+    // =========================================================================
+// =========================================================================
+    // KHU VỰC ĐỘNG CƠ XỬ LÝ
+    // =========================================================================
+    const listContainer = document.getElementById('list-container');
+
+    Object.keys(dataset).forEach(category => {
+        const heading = document.createElement('div');
+        heading.className = 'category-title';
+        heading.innerText = category;
+        listContainer.appendChild(heading);
+
+        dataset[category].forEach(loc => {
+            const htmlIcon = L.divIcon({
+                html: `<div class="map-custom-marker" style="color: ${loc.color};"><i class="fa-solid ${loc.icon}"></i></div>`,
+                className: 'custom-leaflet-div-icon',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
+            });
+
+            // Hiển thị Recommended và Highlight dạng HTML
+            let popupContent = `
+                <div class="popup-card">
+                    ${loc.image ? `<img class="popup-img" src="${loc.image}" alt="${loc.name}">` : ''}
+                    <div class="popup-title">🏪 ${loc.name}</div>
+                    
+                    ${loc.recommended_by ? `<div class="popup-meta"><i class="fa-solid fa-thumbs-up"></i> <b style="white-space: nowrap;">紹介者：</b> ${loc.recommended_by}</div>` : ''}
+                    ${loc.highlight ? `<div class="popup-meta" style="color:#2b6cb0;"><i class="fa-solid fa-star"></i> <b style="white-space: nowrap;">おすすめポイント：</b> ${loc.highlight}</div>` : ''}
+                    
+                    <div class="popup-section-title">⏱️ 営業時間・定休日</div>
+                    <div class="popup-meta"><i class="fa-regular fa-clock"></i> <b style="white-space: nowrap;">営業時間：</b> ${loc.opening_hours || '[営業時間未定]'}</div>
+                    <div class="popup-meta"><i class="fa-solid fa-calendar-xmark"></i> <b style="white-space: nowrap;">定休日：</b> ${loc.dayoff || '[定休日未定]'}</div>
+            `;
+
+            // Ẩn bảng thông tin hàng quán phức tạp đối với Suối nước nóng và Điểm xuất phát Ryokufu kaku
+            if (category !== "外湯" && category !== "当館") {
+                popupContent += `
+                    <div class="popup-section-title">💰 予算・決済</div>
+                    <div class="popup-meta"><i class="fa-solid fa-money-bill-wave"></i> <b style="white-space: nowrap;">予算：</b> ${loc.price_range || '[予算未定]'}</div>
+                    <div class="popup-meta"><i class="fa-regular fa-credit-card"></i> <b style="white-space: nowrap;">カード決済：</b> ${loc.credit_card || '[利用可 / 不可 / 現金のみ]'}</div>
+                    
+                    <div class="popup-section-title">👥 席・サービス</div>
+                    <div class="popup-meta"><i class="fa-solid fa-chair"></i> <b style="white-space: nowrap;">利用形態：</b> ${loc.dine_in || '[店内飲食 / テイクアウト]'}</div>
+                    
+                    <div class="popup-section-title">⏳ 混雑・予約</div>
+                    <div class="popup-meta"><i class="fa-solid fa-hourglass-half"></i> <b style="white-space: nowrap;">混雑時間帯：</b> ${loc.peak_hours || '[時間帯未定]'}</div>
+                    <div class="popup-meta"><i class="fa-solid fa-stopwatch"></i> <b style="white-space: nowrap;">待ち時間目安：</b> ${loc.avg_waiting_time || '[待ち時間未定]'}</div>
+                    <div class="popup-meta"><i class="fa-regular fa-calendar-check"></i> <b style="white-space: nowrap;">予約：</b> ${loc.reservation || '[予約不要 / 予約推奨 / 要予約]'}</div>
+                `;
+            }
+
+            if (loc.google_maps_link) {
+                popupContent += `
+                    <a href="${loc.google_maps_link}" target="_blank" class="gmaps-btn">
+                        <i class="fa-solid fa-map-location-dot"></i> Google Mapsで見る
+                    </a>
+                `;
+            }
+
+            popupContent += `</div>`;
+
+            const marker = L.marker([loc.lat, loc.lng], { icon: htmlIcon }).addTo(map);
+            marker.bindPopup(popupContent);
+
+            const item = document.createElement('div');
+            item.className = 'location-item';
+            item.innerHTML = `
+                <div class="location-item-icon" style="background-color: ${loc.color}20; color: ${loc.color};">
+                    <i class="fa-solid ${loc.icon}"></i>
+                </div>
+                <div class="location-item-info">
+                    <div class="location-item-name">${loc.name}</div>
+                    <div class="location-item-desc">${loc.opening_hours ? `営業時間: ${loc.opening_hours}` : 'クリックして詳細を表示'}</div>
+                </div>
+            `;
+
+            item.addEventListener('click', () => {
+                map.setView([loc.lat, loc.lng], 18, { animate: true, duration: 1 });
+                marker.openPopup();
+                if (window.innerWidth <= 768) {
+                    document.getElementById('map').scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+
+            listContainer.appendChild(item);
+        });
+    });
+
+</script>
+</body>
+</html>
